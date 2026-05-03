@@ -67,4 +67,6 @@ scrapeAndEnqueue manager state url baseURL = do
 
 main :: IO ()
 main = do
-  putStrLn "Hello"
+  let cfg = Crawler.Config {Crawler.userAgent = "web-crawler-hs", Crawler.threadCount = 1}
+  result <- crawl cfg "https://webscraper.io/test-sites/e-commerce/static/"
+  mapM_ BS.putStrLn (Set.toList result)
