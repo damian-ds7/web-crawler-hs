@@ -61,7 +61,8 @@ executable web-crawler-hs
     main-is:          Main.hs
 
     -- Modules included in this executable, other than Main.
-    -- other-modules:
+    other-modules:
+      Crawler.Types,
 
     -- LANGUAGE extensions used by modules in this package.
     default-extensions:
@@ -70,7 +71,11 @@ executable web-crawler-hs
     -- Other library packages from which modules are imported.
     build-depends:
       base ^>=4.18.3.0,
-      scalpel^>=0.6.2.2
+      scalpel^>=0.6.2.2,
+      containers,
+      stm,
+      robots-txt,
+      bytestring,
 
     -- Directories containing source files.
     hs-source-dirs:   app
