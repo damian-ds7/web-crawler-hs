@@ -40,8 +40,8 @@ extractDomain url = do
   uri <- parseURI (BS.unpack url)
   auth <- uriAuthority uri
   let scheme = uriScheme uri
-  let domain = uriRegName auth
-  return $ BS.pack $ scheme <> domain
+      domain = uriRegName auth
+  return $ BS.pack $ scheme <> "//" <> domain
 
 -- TODO: implement robots.txt parsing and appending to map in state
 -- for each new domain with robots-txt
