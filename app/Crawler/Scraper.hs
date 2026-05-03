@@ -1,4 +1,7 @@
-module Crawler.Scraper where
+module Crawler.Scraper
+  ( urls,
+  )
+where
 
 import Crawler.Types (URL)
 import Data.ByteString.Char8 as BS (pack)
