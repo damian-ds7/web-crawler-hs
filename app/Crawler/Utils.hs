@@ -1,6 +1,7 @@
 module Crawler.Utils where
 
-import Crawler.Types (Config (userAgent))
+import Crawler.Types (Config (userAgent), URL)
+import Data.ByteString.Char8 qualified as BS
 import Network.HTTP.Client qualified as HTTP
 import Network.HTTP.Client.TLS qualified as HTTP
 import Network.HTTP.Types.Header qualified as HTTP
@@ -17,3 +18,8 @@ makeManager cfg =
                   (HTTP.hUserAgent, userAgent cfg) : HTTP.requestHeaders req'
               }
       }
+
+normalizeURL :: URL -> URL -> URL
+normalizeURL baseURL href
+  | "/" `BS.isPrefixOf` href = baseURL <> BS.drop 1 href
+  | otherwise = href
