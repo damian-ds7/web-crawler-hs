@@ -82,6 +82,7 @@ executable web-crawler-hs
       http-client,
       http-client-tls,
       http-types,
+      network-uri,
 
     -- Directories containing source files.
     hs-source-dirs:   app
