@@ -1,4 +1,10 @@
-module Crawler.Types where
+module Crawler.Types
+  ( Config (..),
+    State (..),
+    URL,
+    Domain (..),
+  )
+where
 
 import Control.Concurrent.STM (TMVar, TQueue)
 import Data.ByteString.Char8 (ByteString)
@@ -16,7 +22,7 @@ data Config = Config
     threadCount :: Int
   }
 
-data CrawlerState = CrawlerState
+data State = State
   { visitedURLs :: TVar (Set URL),
     urlQueue :: TQueue URL,
     robotsCache :: TVar (Map Domain (TMVar Robot)),
