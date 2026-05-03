@@ -1,7 +1,7 @@
 module Crawler.Types where
 
 import Control.Concurrent.STM (TMVar, TQueue)
-import Data.ByteString (ByteString)
+import Data.ByteString.Char8 (ByteString)
 import Data.Map (Map)
 import Data.Set (Set)
 import GHC.Conc (TVar)
