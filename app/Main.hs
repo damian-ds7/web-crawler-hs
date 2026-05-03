@@ -58,7 +58,8 @@ scrapeAndEnqueue manager state url baseURL = do
   case foundURLs of
     Nothing -> putStrLn "Failed to scrape"
     Just links -> do
-      let normalized = map (normalizeURL baseURL) links
+      let nonEmpty = filter (not . BS.null) links
+          normalized = map (normalizeURL baseURL) nonEmpty
       atomically $ do
         visited <- readTVar (visitedURLs state)
         let unvisited = filter (`Set.notMember` visited) normalized
