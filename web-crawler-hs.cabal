@@ -64,6 +64,7 @@ executable web-crawler-hs
     other-modules:
       Crawler.Types,
       Crawler.Utils,
+      Crawler.State,
 
     -- LANGUAGE extensions used by modules in this package.
     default-extensions:
