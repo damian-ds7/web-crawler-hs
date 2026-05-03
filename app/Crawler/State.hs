@@ -1,4 +1,7 @@
-module Crawler.State where
+module Crawler.State
+  ( initState,
+  )
+where
 
 import Control.Concurrent.STM (newTQueueIO, newTVarIO, writeTQueue)
 import Crawler.Types (Config, State (..), URL)

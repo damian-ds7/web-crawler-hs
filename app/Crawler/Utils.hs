@@ -1,4 +1,10 @@
-module Crawler.Utils where
+module Crawler.Utils
+  ( makeManager,
+    normalizeURL,
+    extractDomain,
+    checkRobots,
+  )
+where
 
 import Crawler.Types (Config (userAgent), State, URL)
 import Data.ByteString.Char8 qualified as BS
