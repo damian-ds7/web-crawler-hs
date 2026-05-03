@@ -1,27 +1,35 @@
 module Main (main) where
 
-import Text.HTML.Scalpel
+import Control.Concurrent.STM
+  ( atomically,
+    modifyTVar,
+    readTVar,
+    writeTQueue,
+  )
+import Crawler.Scraper (urls)
+import Crawler.Types (CrawlerState (visitedURLs), URL, urlQueue)
+import Crawler.Utils (normalizeURL)
+import Data.ByteString.Char8 qualified as BS
+import Data.Default (def)
+import Data.Set qualified as Set
+import Network.HTTP.Client qualified as HTTP
+import Text.HTML.Scalpel (Config (manager), scrapeURLWithConfig)
 
-normalizeURL :: String -> String -> String
-normalizeURL baseURL ('/' : rest) = baseURL ++ "/" ++ rest
-normalizeURL _ href = href
+scrapeAndEnqueue :: HTTP.Manager -> CrawlerState -> URL -> URL -> IO ()
+scrapeAndEnqueue manager state url baseURL = do
+  atomically $ modifyTVar (visitedURLs state) (Set.insert url)
 
-urls :: String -> Scraper String [URL]
-urls baseURL = chroots "a" url
-  where
-    url :: Scraper String URL
-    url = do
-      href <- attr "href" "a"
-      return $ normalizeURL baseURL href
-
-scrapeLinks :: String -> String -> IO (Maybe [URL])
-scrapeLinks baseURL searchURL = scrapeURL searchURL (urls baseURL)
+  let scalpelCfg = def {manager = Just manager}
+  foundURLs <- scrapeURLWithConfig scalpelCfg (BS.unpack url) urls
+  case foundURLs of
+    Nothing -> putStrLn "Failed to scrape"
+    Just links -> do
+      let normalized = map (normalizeURL baseURL) links
+      atomically $ do
+        visited <- readTVar (visitedURLs state)
+        let unvisited = filter (`Set.notMember` visited) normalized
+        mapM_ (writeTQueue (urlQueue state)) unvisited
 
 main :: IO ()
 main = do
-  let baseURL = "https://webscraper.io"
-      searchURL = "https://webscraper.io/test-sites/e-commerce/static/"
-  result <- scrapeLinks baseURL searchURL
-  case result of
-    Nothing -> putStrLn "Scraping failed"
-    Just links -> mapM_ putStrLn links
+  putStrLn "Hello"
