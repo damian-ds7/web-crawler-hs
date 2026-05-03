@@ -20,6 +20,9 @@ import GHC.Conc (readTVarIO)
 import Network.HTTP.Client qualified as HTTP
 import Text.HTML.Scalpel (Config (manager), scrapeURLWithConfig)
 
+-- TODO: add error handling when requests are blocked etc.
+-- mutlithreading, proper robots.txt parsing and usage
+
 crawl :: Crawler.Config -> URL -> IO (Set URL)
 crawl cfg seedURL = do
   state <- initState cfg seedURL
