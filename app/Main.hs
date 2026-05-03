@@ -4,6 +4,7 @@ import Control.Concurrent.STM
   ( atomically,
     modifyTVar,
     readTVar,
+    tryReadTQueue,
     writeTQueue,
   )
 import Crawler.Scraper (urls)
@@ -24,9 +25,19 @@ crawl cfg seedURL = do
   state <- initState cfg seedURL
   manager <- makeManager cfg
 
-  processURL manager state seedURL
+  crawlLoop manager state
 
   readTVarIO (visitedURLs state)
+
+-- TODO: will probably be done wtih a thread pool in the future
+crawlLoop :: HTTP.Manager -> CrawlerState -> IO ()
+crawlLoop manager state = do
+  mUrl <- atomically $ tryReadTQueue (urlQueue state)
+  case mUrl of
+    Nothing -> return ()
+    Just url -> do
+      processURL manager state url
+      crawlLoop manager state
 
 processURL :: HTTP.Manager -> CrawlerState -> URL -> IO ()
 processURL manager state url = do
