@@ -32,7 +32,7 @@ makeManager cfg =
 
 normalizeURL :: URL -> URL -> URL
 normalizeURL baseURL href
-  | "/" `BS.isPrefixOf` href = baseURL <> BS.drop 1 href
+  | "/" `BS.isPrefixOf` href = baseURL <> href
   | otherwise = href
 
 extractDomain :: URL -> Maybe URL
