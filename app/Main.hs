@@ -8,12 +8,22 @@ import Control.Concurrent.STM
   )
 import Crawler.Scraper (urls)
 import Crawler.Types (CrawlerState (visitedURLs), URL, urlQueue)
-import Crawler.Utils (normalizeURL)
+import Crawler.Utils (checkRobots, extractDomain, normalizeURL)
 import Data.ByteString.Char8 qualified as BS
 import Data.Default (def)
 import Data.Set qualified as Set
 import Network.HTTP.Client qualified as HTTP
 import Text.HTML.Scalpel (Config (manager), scrapeURLWithConfig)
+
+processURL :: HTTP.Manager -> CrawlerState -> URL -> IO ()
+processURL manager state url = do
+  case extractDomain url of
+    Nothing -> putStrLn $ "Invalid URL" <> show url
+    Just baseURL -> do
+      allowed <- checkRobots state baseURL url
+      if allowed
+        then scrapeAndEnqueue manager state url baseURL
+        else putStrLn $ "Blocked by robots.txt" <> show url
 
 scrapeAndEnqueue :: HTTP.Manager -> CrawlerState -> URL -> URL -> IO ()
 scrapeAndEnqueue manager state url baseURL = do
