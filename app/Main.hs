@@ -7,13 +7,26 @@ import Control.Concurrent.STM
     writeTQueue,
   )
 import Crawler.Scraper (urls)
+import Crawler.State (initState)
 import Crawler.Types (CrawlerState (visitedURLs), URL, urlQueue)
-import Crawler.Utils (checkRobots, extractDomain, normalizeURL)
+import Crawler.Types qualified as Crawler (Config)
+import Crawler.Utils (checkRobots, extractDomain, makeManager, normalizeURL)
 import Data.ByteString.Char8 qualified as BS
 import Data.Default (def)
+import Data.Set (Set)
 import Data.Set qualified as Set
+import GHC.Conc (readTVarIO)
 import Network.HTTP.Client qualified as HTTP
 import Text.HTML.Scalpel (Config (manager), scrapeURLWithConfig)
+
+crawl :: Crawler.Config -> URL -> IO (Set URL)
+crawl cfg seedURL = do
+  state <- initState cfg seedURL
+  manager <- makeManager cfg
+
+  processURL manager state seedURL
+
+  readTVarIO (visitedURLs state)
 
 processURL :: HTTP.Manager -> CrawlerState -> URL -> IO ()
 processURL manager state url = do
