@@ -1,6 +1,6 @@
 module Crawler.Utils where
 
-import Crawler.Types (Config (userAgent), URL)
+import Crawler.Types (Config (userAgent), CrawlerState, URL)
 import Data.ByteString.Char8 qualified as BS
 import Network.HTTP.Client qualified as HTTP
 import Network.HTTP.Client.TLS qualified as HTTP
@@ -36,3 +36,8 @@ extractDomain url = do
   let scheme = uriScheme uri
   let domain = uriRegName auth
   return $ BS.pack $ scheme <> domain
+
+-- TODO: implement robots.txt parsing and appending to map in state
+-- for each new domain with robots-txt
+checkRobots :: CrawlerState -> URL -> URL -> IO Bool
+checkRobots _state _baseURL _url = return True
