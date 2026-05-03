@@ -11,9 +11,14 @@ type URL = ByteString
 
 newtype Domain = Domain String deriving (Show, Eq, Ord)
 
+data Config = Config
+  { userAgent :: ByteString,
+    threadCount :: Int
+  }
+
 data CrawlerState = CrawlerState
   { visitedURLs :: TVar (Set URL),
     urlQueue :: TQueue URL,
     robotsCache :: TVar (Map Domain (TMVar Robot)),
-    userAgent :: ByteString
+    config :: Config
   }
