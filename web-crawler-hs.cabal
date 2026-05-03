@@ -63,6 +63,7 @@ executable web-crawler-hs
     -- Modules included in this executable, other than Main.
     other-modules:
       Crawler.Types,
+      Crawler.Utils,
 
     -- LANGUAGE extensions used by modules in this package.
     default-extensions:
@@ -76,6 +77,9 @@ executable web-crawler-hs
       stm,
       robots-txt,
       bytestring,
+      http-client,
+      http-client-tls,
+      http-types,
 
     -- Directories containing source files.
     hs-source-dirs:   app
