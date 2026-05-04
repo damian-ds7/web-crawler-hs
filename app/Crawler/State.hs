@@ -14,7 +14,7 @@ initState cfg seedURL = do
   visited <- newTVarIO Set.empty
   queue <- newTQueueIO
   robots <- newTVarIO Map.empty
-  atomically $ writeTQueue queue seedURL
+  atomically $ writeTQueue queue (seedURL, 0)
   return $
     State
       { visitedURLs = visited,
