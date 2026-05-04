@@ -19,12 +19,13 @@ newtype Domain = Domain String deriving (Show, Eq, Ord)
 
 data Config = Config
   { userAgent :: ByteString,
-    threadCount :: Int
+    threadCount :: Int,
+    maxDepth :: Maybe Int
   }
 
 data State = State
   { visitedURLs :: TVar (Set URL),
-    urlQueue :: TQueue URL,
+    urlQueue :: TQueue (URL, Int),
     robotsCache :: TVar (Map Domain (TMVar Robot)),
     config :: Config
   }
