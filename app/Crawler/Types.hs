@@ -2,7 +2,6 @@ module Crawler.Types
   ( Config (..),
     State (..),
     URL,
-    Domain (..),
   )
 where
 
@@ -15,8 +14,6 @@ import Network.HTTP.Robots (Robot)
 
 type URL = ByteString
 
-newtype Domain = Domain String deriving (Show, Eq, Ord)
-
 data Config = Config
   { userAgent :: ByteString,
     threadCount :: Int,
@@ -26,6 +23,6 @@ data Config = Config
 data State = State
   { visitedURLs :: TVar (Set URL),
     urlQueue :: TQueue (URL, Int),
-    robotsCache :: TVar (Map Domain (TMVar Robot)),
+    robotsCache :: TVar (Map URL (TMVar Robot)),
     config :: Config
   }

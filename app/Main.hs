@@ -8,11 +8,12 @@ import Control.Concurrent.STM
     writeTQueue,
   )
 import Control.Monad (forM_, unless)
+import Crawler.Robots (checkRobots, getRobots)
 import Crawler.Scraper (urls)
 import Crawler.State (initState)
 import Crawler.Types (State (visitedURLs), URL, urlQueue)
 import Crawler.Types qualified as Crawler
-import Crawler.Utils (checkRobots, extractDomain, makeManager, normalizeURL)
+import Crawler.Utils (extractDomain, makeManager, normalizeURL)
 import Data.ByteString.Char8 qualified as BS
 import Data.Default (def)
 import Data.Set (Set)
@@ -55,7 +56,8 @@ processURL manager state url depth = do
   case extractDomain url of
     Nothing -> putStrLn $ "Invalid URL" <> show url
     Just baseURL -> do
-      allowed <- checkRobots state baseURL url
+      robot <- getRobots manager state baseURL
+      let allowed = checkRobots robot state url
       if allowed
         then scrapeAndEnqueue manager state url baseURL depth
         else putStrLn $ "Blocked by robots.txt" <> show url
