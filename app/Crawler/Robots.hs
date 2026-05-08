@@ -12,6 +12,7 @@ import Control.Concurrent.STM
     readTMVar,
     readTVar,
   )
+import Crawler.Logger (LogLevel (..), logMessage)
 import Crawler.Types (Config (userAgent), State (config, robotsCache), URL)
 import Data.ByteString.Char8 qualified as BS
 import Data.ByteString.Lazy qualified as BL
@@ -20,8 +21,12 @@ import Network.HTTP.Client (httpLbs, parseRequest, responseBody)
 import Network.HTTP.Client qualified as HTTP
 import Network.HTTP.Robots (Robot, canAccess, parseRobots)
 
-checkRobots :: Robot -> State -> URL -> Bool
-checkRobots robot state = canAccess (userAgent (config state)) robot
+checkRobots :: Robot -> State -> URL -> URL -> Bool
+checkRobots robot state baseURL url =
+  let path = case BS.stripPrefix baseURL url of
+        Just rest -> BS.takeWhile (/= '?') rest
+        Nothing -> url
+   in canAccess (userAgent (config state)) robot path
 
 getRobots :: HTTP.Manager -> State -> URL -> IO Robot
 getRobots manager state baseURL = do
@@ -49,6 +54,6 @@ fetchRobots manager baseURL = do
   let body = BL.toStrict $ responseBody response
   case parseRobots body of
     Left _err -> do
-      putStrLn $ "Failed to fetch robots.txt for " <> show robotsURL
+      logMessage Info $ "No robots.txt file for " <> show baseURL
       pure ([], [])
     Right robot -> pure robot
