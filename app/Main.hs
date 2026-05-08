@@ -8,6 +8,7 @@ import Control.Concurrent.STM
     writeTQueue,
   )
 import Control.Monad (forM_, unless)
+import Crawler.Logger (LogLevel (..), logMessage)
 import Crawler.Robots (checkRobots, getRobots)
 import Crawler.Scraper (urls)
 import Crawler.State (initState)
@@ -54,12 +55,12 @@ crawlLoop manager state = do
 processURL :: HTTP.Manager -> Crawler.State -> URL -> Int -> IO ()
 processURL manager state url depth = do
   case extractDomain url of
-    Nothing -> putStrLn $ "Invalid URL" <> show url
+    Nothing -> logMessage Info $ "Invalid URL: " <> show url
     Just baseURL -> do
       robot <- getRobots manager state baseURL
       if checkRobots robot state baseURL url
         then scrapeAndEnqueue manager state url baseURL depth
-        else putStrLn $ "Blocked by robots.txt" <> show url
+        else logMessage Info $ "Blocked by robots.txt: " <> show url
 
 scrapeAndEnqueue :: HTTP.Manager -> Crawler.State -> URL -> URL -> Int -> IO ()
 scrapeAndEnqueue manager state url baseURL depth = do
@@ -68,7 +69,7 @@ scrapeAndEnqueue manager state url baseURL depth = do
   let scalpelCfg = def {manager = Just manager}
   foundURLs <- scrapeURLWithConfig scalpelCfg (BS.unpack url) urls
   case foundURLs of
-    Nothing -> putStrLn "Failed to scrape"
+    Nothing -> logMessage Error "Failed to scrape"
     Just links -> do
       let nonEmpty = filter (not . BS.null) links
           normalized = map (normalizeURL baseURL) nonEmpty
@@ -80,5 +81,6 @@ scrapeAndEnqueue manager state url baseURL depth = do
 main :: IO ()
 main = do
   let cfg = Crawler.Config {Crawler.userAgent = "web-crawler-hs", Crawler.threadCount = 1, Crawler.maxDepth = Just 2}
-  result <- crawl cfg "https://webscraper.io/test-sites/e-commerce/static/"
+  result <- crawl cfg "https://webscraper.io/test-sites/"
+  putStrLn "\nResults: "
   mapM_ BS.putStrLn (Set.toList result)
