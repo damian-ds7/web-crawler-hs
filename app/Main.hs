@@ -32,9 +32,9 @@ shouldStop state depth =
     Nothing -> False
     Just limit -> depth >= limit
 
-crawl :: Crawler.Config -> URL -> IO (Set URL)
-crawl cfg seedURL = do
-  state <- initState cfg seedURL
+crawl :: Crawler.Config -> IO (Set URL)
+crawl cfg = do
+  state <- initState cfg (Crawler.entrypoint cfg)
   manager <- makeManager cfg
 
   crawlLoop manager state
@@ -80,7 +80,13 @@ scrapeAndEnqueue manager state url baseURL depth = do
 
 main :: IO ()
 main = do
-  let cfg = Crawler.Config {Crawler.userAgent = "web-crawler-hs", Crawler.threadCount = 1, Crawler.maxDepth = Just 2}
-  result <- crawl cfg "https://webscraper.io/test-sites/"
+  let cfg =
+        Crawler.Config
+          { Crawler.userAgent = "web-crawler-hs",
+            Crawler.entrypoint = "https://webscraper.io/test-sites/",
+            Crawler.threadCount = 1,
+            Crawler.maxDepth = Just 2
+          }
+  result <- crawl cfg
   putStrLn "\nResults: "
   mapM_ BS.putStrLn (Set.toList result)
