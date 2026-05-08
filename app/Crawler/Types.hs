@@ -16,6 +16,7 @@ type URL = ByteString
 
 data Config = Config
   { userAgent :: ByteString,
+    entrypoint :: URL,
     threadCount :: Int,
     maxDepth :: Maybe Int
   }
