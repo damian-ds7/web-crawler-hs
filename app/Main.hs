@@ -57,8 +57,7 @@ processURL manager state url depth = do
     Nothing -> putStrLn $ "Invalid URL" <> show url
     Just baseURL -> do
       robot <- getRobots manager state baseURL
-      let allowed = checkRobots robot state url
-      if allowed
+      if checkRobots robot state baseURL url
         then scrapeAndEnqueue manager state url baseURL depth
         else putStrLn $ "Blocked by robots.txt" <> show url
 
