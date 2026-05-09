@@ -2,8 +2,7 @@ module Main (main) where
 
 import Control.Concurrent.Async (replicateConcurrently_)
 import Control.Concurrent.STM
-  ( STM,
-    TVar,
+  ( TVar,
     atomically,
     modifyTVar,
     newTVarIO,
@@ -49,25 +48,23 @@ crawlLoop manager state = do
 
 workerLoop :: HTTP.Manager -> Crawler.State -> TVar Int -> IO ()
 workerLoop manager state inFlight = do
-  queueRecord <- atomically $ dequeueWork state inFlight
-  case queueRecord of
-    Just (url, depth) -> do
-      atomically $ modifyTVar inFlight (+ 1)
-      processURL manager state url depth
-      atomically $ modifyTVar inFlight (\x -> x - 1)
-      workerLoop manager state inFlight
-    Nothing -> return ()
+  queueRecord <- atomically $ do
+    m <- tryReadTQueue (urlQueue state)
+    case m of
+      Just work -> return $ Just work
+      Nothing -> do
+        n <- readTVar inFlight
+        if n /= 0 then retry else return Nothing
 
-dequeueWork :: Crawler.State -> TVar Int -> STM (Maybe (URL, Int))
-dequeueWork state inFlight = do
-  queueRecord <- tryReadTQueue (urlQueue state)
   case queueRecord of
     Just (url, depth)
-      | shouldStop state depth -> dequeueWork state inFlight
-      | otherwise -> return $ Just (url, depth)
-    Nothing -> do
-      n <- readTVar inFlight
-      if n /= 0 then retry else return Nothing
+      | shouldStop state depth -> workerLoop manager state inFlight
+      | otherwise -> do
+          atomically $ modifyTVar inFlight (+ 1)
+          processURL manager state url depth
+          atomically $ modifyTVar inFlight (\x -> x - 1)
+          workerLoop manager state inFlight
+    Nothing -> return ()
 
 processURL :: HTTP.Manager -> Crawler.State -> URL -> Int -> IO ()
 processURL manager state url depth = do
