@@ -54,6 +54,6 @@ fetchRobots manager baseURL = do
   let body = BL.toStrict $ responseBody response
   case parseRobots body of
     Left _err -> do
-      logMessage Info $ "No robots.txt file for " <> show baseURL
+      logMessage Info $ "File robots.txt missing: " <> show baseURL
       pure ([], [])
     Right robot -> pure robot
