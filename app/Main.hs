@@ -1,13 +1,18 @@
 module Main (main) where
 
+import Control.Concurrent.Async (replicateConcurrently_)
 import Control.Concurrent.STM
-  ( atomically,
+  ( STM,
+    TVar,
+    atomically,
     modifyTVar,
+    newTVarIO,
     readTVar,
+    retry,
     tryReadTQueue,
     writeTQueue,
   )
-import Control.Monad (forM_, unless)
+import Control.Monad (forM_)
 import Crawler.Logger (LogLevel (..), logMessage)
 import Crawler.Robots (checkRobots, getRobots)
 import Crawler.Scraper (urls)
@@ -23,9 +28,6 @@ import GHC.Conc (readTVarIO)
 import Network.HTTP.Client qualified as HTTP
 import Text.HTML.Scalpel (Config (manager), scrapeURLWithConfig)
 
--- TODO: add error handling when requests are blocked etc.
--- mutlithreading, proper robots.txt parsing and usage
-
 shouldStop :: Crawler.State -> Int -> Bool
 shouldStop state depth =
   case Crawler.maxDepth (Crawler.config state) of
@@ -36,21 +38,37 @@ crawl :: Crawler.Config -> IO (Set URL)
 crawl cfg = do
   state <- initState cfg (Crawler.entrypoint cfg)
   manager <- makeManager cfg
-
   crawlLoop manager state
-
   readTVarIO (visitedURLs state)
 
--- TODO: will probably be done wtih a thread pool in the future
 crawlLoop :: HTTP.Manager -> Crawler.State -> IO ()
 crawlLoop manager state = do
-  mUrl <- atomically $ tryReadTQueue (urlQueue state)
-  case mUrl of
-    Nothing -> return ()
-    Just (url, depth) -> do
-      unless (shouldStop state depth) $ do
+  inFlight <- newTVarIO (0 :: Int)
+  let n = max 1 (Crawler.threadCount (Crawler.config state))
+  replicateConcurrently_ n (workerLoop manager state inFlight)
+
+workerLoop :: HTTP.Manager -> Crawler.State -> TVar Int -> IO ()
+workerLoop manager state inFlight = do
+  queueRecord <- atomically $ dequeueWork state inFlight
+  case queueRecord of
+    Just (url, depth) ->
+      do
+        atomically $ modifyTVar inFlight (+ 1)
         processURL manager state url depth
-      crawlLoop manager state
+        atomically $ modifyTVar inFlight (\x -> x - 1)
+        workerLoop manager state inFlight
+    Nothing -> return ()
+
+dequeueWork :: Crawler.State -> TVar Int -> STM (Maybe (URL, Int))
+dequeueWork state inFlight = do
+  queueRecord <- tryReadTQueue (urlQueue state)
+  case queueRecord of
+    Just (url, depth)
+      | shouldStop state depth -> dequeueWork state inFlight
+      | otherwise -> return $ Just (url, depth)
+    Nothing -> do
+      n <- readTVar inFlight
+      if n /= 0 then retry else return Nothing
 
 processURL :: HTTP.Manager -> Crawler.State -> URL -> Int -> IO ()
 processURL manager state url depth = do
@@ -84,7 +102,7 @@ main = do
         Crawler.Config
           { Crawler.userAgent = "web-crawler-hs",
             Crawler.entrypoint = "https://webscraper.io/test-sites/",
-            Crawler.threadCount = 1,
+            Crawler.threadCount = 8,
             Crawler.maxDepth = Just 2
           }
   result <- crawl cfg
