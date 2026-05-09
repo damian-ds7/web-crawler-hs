@@ -51,12 +51,11 @@ workerLoop :: HTTP.Manager -> Crawler.State -> TVar Int -> IO ()
 workerLoop manager state inFlight = do
   queueRecord <- atomically $ dequeueWork state inFlight
   case queueRecord of
-    Just (url, depth) ->
-      do
-        atomically $ modifyTVar inFlight (+ 1)
-        processURL manager state url depth
-        atomically $ modifyTVar inFlight (\x -> x - 1)
-        workerLoop manager state inFlight
+    Just (url, depth) -> do
+      atomically $ modifyTVar inFlight (+ 1)
+      processURL manager state url depth
+      atomically $ modifyTVar inFlight (\x -> x - 1)
+      workerLoop manager state inFlight
     Nothing -> return ()
 
 dequeueWork :: Crawler.State -> TVar Int -> STM (Maybe (URL, Int))
