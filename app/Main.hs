@@ -12,13 +12,14 @@ import Control.Concurrent.STM
     writeTQueue,
   )
 import Control.Monad (forM_)
+import Crawler.Fetch (fetchURL, makeManager)
 import Crawler.Logger (LogLevel (..), logMessage)
-import Crawler.Robots (checkRobots, getRobots)
+import Crawler.Robots (cacheRobot, checkRobot, parseRobot)
 import Crawler.Scraper (urls)
 import Crawler.State (initState)
 import Crawler.Types (State (visitedURLs), URL, urlQueue)
 import Crawler.Types qualified as Crawler
-import Crawler.Utils (extractDomain, makeManager, normalizeURL)
+import Crawler.Utils (extractDomain, normalizeURL)
 import Data.ByteString.Char8 qualified as BS
 import Data.Default (def)
 import Data.Set (Set)
@@ -71,15 +72,20 @@ processURL manager state url depth = do
   case extractDomain url of
     Nothing -> logMessage Info $ "Invalid URL: " <> show url
     Just baseURL -> do
-      robot <- getRobots manager state baseURL
-      if checkRobots robot state baseURL url
-        then scrapeAndEnqueue manager state url baseURL depth
-        else logMessage Info $ "Blocked by robots.txt: " <> show url
+      let robotsURL = baseURL <> "/robots.txt"
+      res <- fetchURL manager robotsURL
+      case res of
+        Left err -> logMessage Warn $ "Failed to fetch robots.txt: " <> show err
+        Right body -> do
+          let robot = parseRobot body
+          cacheRobot state baseURL robot
+          if checkRobot robot state baseURL url
+            then scrapeAndEnqueue manager state url baseURL depth
+            else logMessage Info $ "Blocked by robots.txt: " <> show url
 
 scrapeAndEnqueue :: HTTP.Manager -> Crawler.State -> URL -> URL -> Int -> IO ()
 scrapeAndEnqueue manager state url baseURL depth = do
   atomically $ modifyTVar (visitedURLs state) (Set.insert url)
-
   let scalpelCfg = def {manager = Just manager}
   foundURLs <- scrapeURLWithConfig scalpelCfg (BS.unpack url) urls
   case foundURLs of
@@ -99,7 +105,7 @@ main = do
           { Crawler.userAgent = "web-crawler-hs",
             Crawler.entrypoint = "https://webscraper.io/test-sites/",
             Crawler.threadCount = 8,
-            Crawler.maxDepth = Just 2
+            Crawler.maxDepth = Just 4
           }
   result <- crawl cfg
   putStrLn "\nResults: "
