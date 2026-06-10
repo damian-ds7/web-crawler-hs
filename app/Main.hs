@@ -14,8 +14,8 @@ import Control.Concurrent.STM
 import Control.Monad (forM_)
 import Crawler.Fetch (FetchError (..), fetchURL, makeManager)
 import Crawler.Logger (LogLevel (..), logMessage)
+import Crawler.Parser (parseLinks)
 import Crawler.Robots (cacheRobot, checkRobot, parseRobot)
-import Crawler.Scraper (urls)
 import Crawler.State (initState)
 import Crawler.Types (State (blockedDomains, visitedURLs), URL, urlQueue)
 import Crawler.Types qualified as Crawler
@@ -107,13 +107,18 @@ processURL manager state url depth = do
 scrapeAndEnqueue :: HTTP.Manager -> Crawler.State -> URL -> URL -> Int -> IO ()
 scrapeAndEnqueue manager state url baseURL depth = do
   atomically $ modifyTVar (visitedURLs state) (Set.insert url)
-  foundURLs <- urls manager url
-  let nonEmpty = filter (not . BS.null) foundURLs
-      normalized = map (normalizeURL baseURL) nonEmpty
-  atomically $ do
-    visited <- readTVar (visitedURLs state)
-    let unvisited = filter (`Set.notMember` visited) normalized
-    forM_ unvisited $ writeTQueue (urlQueue state) . (,depth + 1)
+  res <- fetchWithBlocking manager state baseURL url
+  case res of
+    Left DomainBlocked -> return ()
+    Left err -> logMessage Error $ "Failed to scrape " <> show url <> ": " <> show err
+    Right body -> do
+      let foundURLs = parseLinks body
+          nonEmpty = filter (not . BS.null) foundURLs
+          normalized = map (normalizeURL baseURL) nonEmpty
+      atomically $ do
+        visited <- readTVar (visitedURLs state)
+        let unvisited = filter (`Set.notMember` visited) normalized
+        forM_ unvisited $ writeTQueue (urlQueue state) . (,depth + 1)
 
 main :: IO ()
 main = do
