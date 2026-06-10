@@ -70,12 +70,12 @@ workerLoop manager state inFlight = do
 processURL :: HTTP.Manager -> Crawler.State -> URL -> Int -> IO ()
 processURL manager state url depth = do
   case extractDomain url of
-    Nothing -> logMessage Info $ "Invalid URL: " <> show url
+    Nothing -> logMessage Info $ "Skipping malformed URL: " <> show url
     Just baseURL -> do
       let robotsURL = baseURL <> "/robots.txt"
       res <- fetchURL manager robotsURL
       case res of
-        Left err -> logMessage Warn $ "Failed to fetch robots.txt: " <> show err
+        Left err -> logMessage Warn $ "Failed to fetch robots.txt, allowing all: " <> show baseURL <> " (" <> show err <> ")"
         Right body -> do
           let robot = parseRobot body
           cacheRobot state baseURL robot
@@ -83,6 +83,7 @@ processURL manager state url depth = do
             then scrapeAndEnqueue manager state url baseURL depth
             else logMessage Info $ "Blocked by robots.txt: " <> show url
 
+-- TODO: Replace scalpel with custom fetching/parsing logic
 scrapeAndEnqueue :: HTTP.Manager -> Crawler.State -> URL -> URL -> Int -> IO ()
 scrapeAndEnqueue manager state url baseURL depth = do
   atomically $ modifyTVar (visitedURLs state) (Set.insert url)
@@ -105,7 +106,7 @@ main = do
           { Crawler.userAgent = "web-crawler-hs",
             Crawler.entrypoint = "https://webscraper.io/test-sites/",
             Crawler.threadCount = 8,
-            Crawler.maxDepth = Just 4
+            Crawler.maxDepth = Just 2
           }
   result <- crawl cfg
   putStrLn "\nResults: "
