@@ -25,5 +25,6 @@ data State = State
   { visitedURLs :: TVar (Set URL),
     urlQueue :: TQueue (URL, Int),
     robotsCache :: TVar (Map URL (TMVar Robot)),
+    blockedDomains :: TVar (Set URL),
     config :: Config
   }
