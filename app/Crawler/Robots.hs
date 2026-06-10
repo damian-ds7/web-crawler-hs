@@ -1,7 +1,6 @@
 module Crawler.Robots
-  ( cacheRobot,
+  ( getRobot,
     checkRobot,
-    parseRobot,
   )
 where
 
@@ -10,12 +9,20 @@ import Control.Concurrent.STM
     modifyTVar,
     newEmptyTMVar,
     putTMVar,
+    readTMVar,
     readTVar,
   )
+import Crawler.Fetch (FetchError (DomainBlocked), fetchWithBlocking)
+import Crawler.Logger (LogLevel (Warn), logMessage)
 import Crawler.Types (Config (userAgent), State (config, robotsCache), URL)
 import Data.ByteString.Char8 qualified as BS (ByteString, stripPrefix, takeWhile)
+import Data.Either (fromRight)
 import Data.Map qualified as Map (insert, lookup)
+import Network.HTTP.Client (Manager)
 import Network.HTTP.Robots (Robot, canAccess, parseRobots)
+
+emptyRobot :: Robot
+emptyRobot = ([], [])
 
 checkRobot :: Robot -> State -> URL -> URL -> Bool
 checkRobot robot state baseURL url =
@@ -24,8 +31,8 @@ checkRobot robot state baseURL url =
         Nothing -> url
    in canAccess (userAgent (config state)) robot path
 
-cacheRobot :: State -> URL -> Robot -> IO ()
-cacheRobot state baseURL robot = do
+getRobot :: Manager -> State -> URL -> IO Robot
+getRobot manager state baseURL = do
   entry <- atomically $ do
     cache <- readTVar (robotsCache state)
     case Map.lookup baseURL cache of
@@ -36,14 +43,22 @@ cacheRobot state baseURL robot = do
         return (Left slot)
 
   case entry of
-    Right _ -> pure ()
+    Right slot -> atomically $ readTMVar slot
     Left slot -> do
+      robot <- fetchRobot manager state baseURL
       atomically $ putTMVar slot robot
+      return robot
+
+fetchRobot :: Manager -> State -> URL -> IO Robot
+fetchRobot manager state baseURL = do
+  res <- fetchWithBlocking manager state baseURL (baseURL <> "/robots.txt")
+  case res of
+    Left DomainBlocked -> pure emptyRobot
+    Left err -> do
+      logMessage Warn $ "Failed to fetch robots.txt, allowing all: " <> show baseURL <> " (" <> show err <> ")"
+      pure emptyRobot
+    Right body -> pure $ parseRobot body
 
 parseRobot :: BS.ByteString -> Robot
-parseRobot text =
-  case parseRobots text of
-    Left _err -> emptyRobot
-    Right robot -> robot
-  where
-    emptyRobot = ([], [])
+parseRobot =
+  fromRight emptyRobot . parseRobots
