@@ -5,6 +5,7 @@ module Crawler.Logger
 where
 
 import Data.Time
+import Text.Printf (printf)
 
 data LogLevel
   = Debug
@@ -16,4 +17,5 @@ data LogLevel
 logMessage :: LogLevel -> String -> IO ()
 logMessage level message = do
   now <- getCurrentTime
-  putStrLn (show now ++ " | " ++ show level ++ " | " ++ message)
+  let ts = formatTime defaultTimeLocale "%Y-%m-%d %H:%M:%S%3Q" now -- fixed: .NNN ms
+  printf "%s | %-5s | %s\n" ts (show level) message
