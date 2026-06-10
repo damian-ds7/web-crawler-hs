@@ -78,6 +78,7 @@ executable web-crawler-hs
     build-depends:
       base ^>=4.18.3.0,
       async,
+      regex-tdfa,
       scalpel^>=0.6.2.2,
       containers,
       time,
