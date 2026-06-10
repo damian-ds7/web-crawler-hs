@@ -11,7 +11,7 @@ import Control.Concurrent.STM
     tryReadTQueue,
     writeTQueue,
   )
-import Control.Monad (forM_)
+import Control.Monad (forM_, when)
 import Crawler.Fetch (FetchError (..), fetchURL, makeManager)
 import Crawler.Logger (LogLevel (..), logMessage)
 import Crawler.Parser (parseLinks)
@@ -70,10 +70,14 @@ isDomainBlocked state baseURL = atomically $ do
   blocked <- readTVar (blockedDomains state)
   return $ Set.member baseURL blocked
 
-blockDomain :: Crawler.State -> URL -> IO ()
-blockDomain state baseURL = do
-  logMessage Warn $ "Domain returned 429, blocking: " <> show baseURL
-  atomically $ modifyTVar (blockedDomains state) (Set.insert baseURL)
+blockDomain :: Crawler.State -> URL -> IO Bool
+blockDomain state baseURL = atomically $ do
+  blocked <- readTVar (blockedDomains state)
+  if Set.member baseURL blocked
+    then return False
+    else do
+      modifyTVar (blockedDomains state) (Set.insert baseURL)
+      return True
 
 fetchWithBlocking :: HTTP.Manager -> Crawler.State -> URL -> URL -> IO (Either FetchError BS.ByteString)
 fetchWithBlocking manager state baseURL url = do
@@ -86,7 +90,8 @@ fetchWithBlocking manager state baseURL url = do
       res <- fetchURL manager url
       case res of
         Left (HttpStatusError 429) -> do
-          blockDomain state baseURL
+          newlyBlocked <- blockDomain state baseURL
+          when newlyBlocked $ logMessage Warn $ "Domain returned 429, blocking: " <> show baseURL
           return $ Left DomainBlocked
         _ -> return res
 
@@ -134,7 +139,7 @@ main = do
           { Crawler.userAgent = "web-crawler-hs",
             Crawler.entrypoint = "https://webscraper.io/test-sites/",
             Crawler.threadCount = 8,
-            Crawler.maxDepth = Just 7
+            Crawler.maxDepth = Just 2
           }
   result <- crawl cfg
   putStrLn "\nResults: "
