@@ -3,11 +3,10 @@ module Crawler.State
   )
 where
 
-import Control.Concurrent.STM (newTQueueIO, newTVarIO, writeTQueue)
+import Control.Concurrent.STM (atomically, newTQueueIO, newTVarIO, writeTQueue)
 import Crawler.Types (Config, State (..), URL)
-import Data.Map qualified as Map
-import Data.Set qualified as Set
-import GHC.Conc (atomically)
+import Data.Map qualified as Map (empty)
+import Data.Set qualified as Set (empty)
 
 initState :: Config -> URL -> IO State
 initState cfg seedURL = do

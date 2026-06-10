@@ -5,7 +5,7 @@ module Crawler.Utils
 where
 
 import Crawler.Types (URL)
-import Data.ByteString.Char8 qualified as BS
+import Data.ByteString.Char8 qualified as BS (isPrefixOf, pack, unpack)
 import Network.URI
   ( URI (uriAuthority, uriScheme),
     URIAuth (uriRegName),
