@@ -17,7 +17,7 @@ import Crawler.Logger (LogLevel (..), logMessage)
 import Crawler.Robots (cacheRobot, checkRobot, parseRobot)
 import Crawler.Scraper (urls)
 import Crawler.State (initState)
-import Crawler.Types (State (visitedURLs), URL, urlQueue)
+import Crawler.Types (State (blockedDomains, visitedURLs), URL, urlQueue)
 import Crawler.Types qualified as Crawler
 import Crawler.Utils (extractDomain, normalizeURL)
 import Data.ByteString.Char8 qualified as BS
@@ -64,6 +64,11 @@ workerLoop manager state inFlight = do
           atomically $ modifyTVar inFlight (\x -> x - 1)
           workerLoop manager state inFlight
     Nothing -> return ()
+
+isDomainBlocked :: Crawler.State -> URL -> IO Bool
+isDomainBlocked state baseURL = atomically $ do
+  blocked <- readTVar (blockedDomains state)
+  return $ Set.member baseURL blocked
 
 processURL :: HTTP.Manager -> Crawler.State -> URL -> Int -> IO ()
 processURL manager state url depth = do
