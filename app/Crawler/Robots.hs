@@ -13,9 +13,8 @@ import Control.Concurrent.STM
     readTVar,
   )
 import Crawler.Types (Config (userAgent), State (config, robotsCache), URL)
-import Data.ByteString (ByteString)
-import Data.ByteString.Char8 qualified as BS
-import Data.Map qualified as Map
+import Data.ByteString.Char8 qualified as BS (ByteString, stripPrefix, takeWhile)
+import Data.Map qualified as Map (insert, lookup)
 import Network.HTTP.Robots (Robot, canAccess, parseRobots)
 
 checkRobot :: Robot -> State -> URL -> URL -> Bool
@@ -41,7 +40,7 @@ cacheRobot state baseURL robot = do
     Left slot -> do
       atomically $ putTMVar slot robot
 
-parseRobot :: ByteString -> Robot
+parseRobot :: BS.ByteString -> Robot
 parseRobot text =
   case parseRobots text of
     Left _err -> emptyRobot

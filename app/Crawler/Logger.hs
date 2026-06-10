@@ -4,7 +4,7 @@ module Crawler.Logger
   )
 where
 
-import Data.Time
+import Data.Time (defaultTimeLocale, formatTime, getCurrentTime)
 import Text.Printf (printf)
 
 data LogLevel

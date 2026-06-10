@@ -6,40 +6,50 @@ where
 
 import Control.Exception (try)
 import Crawler.Types (Config (userAgent), URL)
-import Data.ByteString.Char8 qualified as BS
-import Data.ByteString.Lazy qualified as BL
-import Network.HTTP.Client qualified as HTTP
-import Network.HTTP.Client.TLS qualified as HTTP
-import Network.HTTP.Types qualified as HTTP
+import Data.ByteString.Char8 (ByteString, unpack)
+import Data.ByteString.Lazy (toStrict)
+import Network.HTTP.Client
+  ( HttpException,
+    Manager,
+    httpLbs,
+    managerModifyRequest,
+    newManager,
+    parseRequest,
+    requestHeaders,
+    responseBody,
+    responseStatus,
+  )
+import Network.HTTP.Client.TLS (tlsManagerSettings)
+import Network.HTTP.Types (hUserAgent, status200, status300, statusCode)
 
-makeManager :: Config -> IO HTTP.Manager
+makeManager :: Config -> IO Manager
 makeManager cfg =
-  HTTP.newManager $
-    HTTP.tlsManagerSettings
-      { HTTP.managerModifyRequest = \req -> do
-          req' <- HTTP.managerModifyRequest HTTP.tlsManagerSettings req
+  newManager $
+    tlsManagerSettings
+      { managerModifyRequest = \req -> do
+          req' <- managerModifyRequest tlsManagerSettings req
           return $
             req'
-              { HTTP.requestHeaders =
-                  (HTTP.hUserAgent, userAgent cfg) : HTTP.requestHeaders req'
+              { requestHeaders =
+                  (hUserAgent, userAgent cfg) : requestHeaders req'
               }
       }
 
 data FetchError
-  = TransportError HTTP.HttpException
+  = TransportError HttpException
   | HttpStatusError Int
   deriving (Show)
 
-fetchURL :: HTTP.Manager -> URL -> IO (Either FetchError BS.ByteString)
+fetchURL :: Manager -> URL -> IO (Either FetchError ByteString)
 fetchURL manager url = do
   result <- try $ do
-    req <- HTTP.parseRequest $ BS.unpack url
-    HTTP.httpLbs req manager
+    req <- parseRequest $ unpack url
+    httpLbs req manager
 
   pure $ case result of
     Left e -> Left (TransportError e)
     Right res ->
-      let code = HTTP.statusCode (HTTP.responseStatus res)
-       in if code >= 200 && code < 300
-            then Right (BL.toStrict $ HTTP.responseBody res)
-            else Left (HttpStatusError code)
+      let code = responseStatus res
+       in if code >= status200 && code < status300
+            then Right (toStrict $ responseBody res)
+            else Left (HttpStatusError $ statusCode code)
