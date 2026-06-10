@@ -68,6 +68,7 @@ executable web-crawler-hs
       Crawler.Scraper,
       Crawler.Robots,
       Crawler.Logger,
+      Crawler.Fetch,
 
     -- LANGUAGE extensions used by modules in this package.
     default-extensions:

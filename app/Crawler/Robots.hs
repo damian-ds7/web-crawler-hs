@@ -1,6 +1,7 @@
 module Crawler.Robots
-  ( getRobots,
-    checkRobots,
+  ( cacheRobot,
+    checkRobot,
+    parseRobot,
   )
 where
 
@@ -9,27 +10,23 @@ import Control.Concurrent.STM
     modifyTVar,
     newEmptyTMVar,
     putTMVar,
-    readTMVar,
     readTVar,
   )
-import Crawler.Logger (LogLevel (..), logMessage)
 import Crawler.Types (Config (userAgent), State (config, robotsCache), URL)
+import Data.ByteString (ByteString)
 import Data.ByteString.Char8 qualified as BS
-import Data.ByteString.Lazy qualified as BL
 import Data.Map qualified as Map
-import Network.HTTP.Client (httpLbs, parseRequest, responseBody)
-import Network.HTTP.Client qualified as HTTP
 import Network.HTTP.Robots (Robot, canAccess, parseRobots)
 
-checkRobots :: Robot -> State -> URL -> URL -> Bool
-checkRobots robot state baseURL url =
+checkRobot :: Robot -> State -> URL -> URL -> Bool
+checkRobot robot state baseURL url =
   let path = case BS.stripPrefix baseURL url of
         Just rest -> BS.takeWhile (/= '?') rest
         Nothing -> url
    in canAccess (userAgent (config state)) robot path
 
-getRobots :: HTTP.Manager -> State -> URL -> IO Robot
-getRobots manager state baseURL = do
+cacheRobot :: State -> URL -> Robot -> IO ()
+cacheRobot state baseURL robot = do
   entry <- atomically $ do
     cache <- readTVar (robotsCache state)
     case Map.lookup baseURL cache of
@@ -40,20 +37,14 @@ getRobots manager state baseURL = do
         return (Left slot)
 
   case entry of
-    Right slot -> atomically $ readTMVar slot
+    Right _ -> pure ()
     Left slot -> do
-      robot <- fetchRobots manager baseURL
       atomically $ putTMVar slot robot
-      return robot
 
-fetchRobots :: HTTP.Manager -> URL -> IO Robot
-fetchRobots manager baseURL = do
-  let robotsURL = BS.unpack (baseURL <> "/robots.txt")
-  request <- parseRequest robotsURL
-  response <- httpLbs request manager
-  let body = BL.toStrict $ responseBody response
-  case parseRobots body of
-    Left _err -> do
-      logMessage Info $ "File robots.txt missing: " <> show baseURL
-      pure ([], [])
-    Right robot -> pure robot
+parseRobot :: ByteString -> Robot
+parseRobot text =
+  case parseRobots text of
+    Left _err -> emptyRobot
+    Right robot -> robot
+  where
+    emptyRobot = ([], [])
