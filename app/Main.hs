@@ -92,17 +92,22 @@ processURL :: HTTP.Manager -> Crawler.State -> URL -> Int -> IO ()
 processURL manager state url depth = do
   case extractDomain url of
     Nothing -> logMessage Info $ "Skipping malformed URL: " <> show url
-    Just baseURL -> do
-      let robotsURL = baseURL <> "/robots.txt"
-      res <- fetchURL manager robotsURL
-      case res of
-        Left err -> logMessage Warn $ "Failed to fetch robots.txt, allowing all: " <> show baseURL <> " (" <> show err <> ")"
-        Right body -> do
-          let robot = parseRobot body
-          cacheRobot state baseURL robot
-          if checkRobot robot state baseURL url
-            then scrapeAndEnqueue manager state url baseURL depth
-            else logMessage Info $ "Blocked by robots.txt: " <> show url
+    Just baseURL -> handleRobotsTxt manager state url baseURL depth
+
+handleRobotsTxt :: HTTP.Manager -> Crawler.State -> URL -> URL -> Int -> IO ()
+handleRobotsTxt manager state url baseURL depth = do
+  res <- fetchWithBlocking manager state baseURL (baseURL <> "/robots.txt")
+  case res of
+    Left DomainBlocked -> logMessage Info $ "Skipping blocked domain: " <> show baseURL
+    Left err -> do
+      logMessage Warn $ "Failed to fetch robots.txt, allowing all: " <> show baseURL <> " (" <> show err <> ")"
+      scrapeAndEnqueue manager state url baseURL depth
+    Right body -> do
+      let robot = parseRobot body
+      cacheRobot state baseURL robot
+      if checkRobot robot state baseURL url
+        then scrapeAndEnqueue manager state url baseURL depth
+        else logMessage Info $ "Blocked by robots.txt: " <> show url
 
 scrapeAndEnqueue :: HTTP.Manager -> Crawler.State -> URL -> URL -> Int -> IO ()
 scrapeAndEnqueue manager state url baseURL depth = do
