@@ -21,12 +21,10 @@ import Crawler.Types (State (visitedURLs), URL, urlQueue)
 import Crawler.Types qualified as Crawler
 import Crawler.Utils (extractDomain, normalizeURL)
 import Data.ByteString.Char8 qualified as BS
-import Data.Default (def)
 import Data.Set (Set)
 import Data.Set qualified as Set
 import GHC.Conc (readTVarIO)
 import Network.HTTP.Client qualified as HTTP
-import Text.HTML.Scalpel (Config (manager), scrapeURLWithConfig)
 
 shouldStop :: Crawler.State -> Int -> Bool
 shouldStop state depth =
@@ -83,21 +81,16 @@ processURL manager state url depth = do
             then scrapeAndEnqueue manager state url baseURL depth
             else logMessage Info $ "Blocked by robots.txt: " <> show url
 
--- TODO: Replace scalpel with custom fetching/parsing logic
 scrapeAndEnqueue :: HTTP.Manager -> Crawler.State -> URL -> URL -> Int -> IO ()
 scrapeAndEnqueue manager state url baseURL depth = do
   atomically $ modifyTVar (visitedURLs state) (Set.insert url)
-  let scalpelCfg = def {manager = Just manager}
-  foundURLs <- scrapeURLWithConfig scalpelCfg (BS.unpack url) urls
-  case foundURLs of
-    Nothing -> logMessage Error "Failed to scrape"
-    Just links -> do
-      let nonEmpty = filter (not . BS.null) links
-          normalized = map (normalizeURL baseURL) nonEmpty
-      atomically $ do
-        visited <- readTVar (visitedURLs state)
-        let unvisited = filter (`Set.notMember` visited) normalized
-        forM_ unvisited $ writeTQueue (urlQueue state) . (,depth + 1)
+  foundURLs <- urls manager url
+  let nonEmpty = filter (not . BS.null) foundURLs
+      normalized = map (normalizeURL baseURL) nonEmpty
+  atomically $ do
+    visited <- readTVar (visitedURLs state)
+    let unvisited = filter (`Set.notMember` visited) normalized
+    forM_ unvisited $ writeTQueue (urlQueue state) . (,depth + 1)
 
 main :: IO ()
 main = do

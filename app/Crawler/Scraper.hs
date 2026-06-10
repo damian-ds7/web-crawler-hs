@@ -3,12 +3,19 @@ module Crawler.Scraper
   )
 where
 
+import Crawler.Fetch (fetchURL)
 import Crawler.Types (URL)
-import Data.ByteString.Char8 as BS (pack)
-import Text.HTML.Scalpel (Scraper, attr, chroots)
+import Data.ByteString.Char8 qualified as BS
+import Network.HTTP.Client (Manager)
+import Text.Regex.TDFA ((=~))
 
-urls :: Scraper String [URL]
-urls = chroots "a" url
-  where
-    url :: Scraper String URL
-    url = BS.pack <$> attr "href" "a"
+urls :: Manager -> URL -> IO [URL]
+urls manager url = do
+  res <- fetchURL manager url
+  case res of
+    Left _ -> return []
+    Right body -> do
+      -- Regex to match <a ... href="url" ...> or <a ... href='url' ...>
+      let regex = "<a[^>]+href=[\"']([^\"']+)[\"']" :: BS.ByteString
+      let matches = body =~ regex :: [[BS.ByteString]]
+      return [m !! 1 | m <- matches, length m > 1]
