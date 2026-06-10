@@ -65,7 +65,6 @@ executable web-crawler-hs
       Crawler.Types,
       Crawler.Utils,
       Crawler.State,
-      Crawler.Scraper,
       Crawler.Parser,
       Crawler.Robots,
       Crawler.Logger,
