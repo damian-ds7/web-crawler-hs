@@ -12,7 +12,7 @@ import Control.Concurrent.STM
     writeTQueue,
   )
 import Control.Monad (forM_)
-import Crawler.Fetch (fetchURL, makeManager)
+import Crawler.Fetch (FetchError (..), fetchURL, makeManager)
 import Crawler.Logger (LogLevel (..), logMessage)
 import Crawler.Robots (cacheRobot, checkRobot, parseRobot)
 import Crawler.Scraper (urls)
@@ -74,6 +74,19 @@ blockDomain :: Crawler.State -> URL -> IO ()
 blockDomain state baseURL = do
   logMessage Warn $ "Domain returned 429, blocking: " <> show baseURL
   atomically $ modifyTVar (blockedDomains state) (Set.insert baseURL)
+
+fetchWithBlocking :: HTTP.Manager -> Crawler.State -> URL -> URL -> IO (Either FetchError BS.ByteString)
+fetchWithBlocking manager state baseURL url = do
+  blocked <- isDomainBlocked state baseURL
+  if blocked
+    then return $ Left DomainBlocked
+    else do
+      res <- fetchURL manager url
+      case res of
+        Left (HttpStatusError 429) -> do
+          blockDomain state baseURL
+          return $ Left DomainBlocked
+        _ -> return res
 
 processURL :: HTTP.Manager -> Crawler.State -> URL -> Int -> IO ()
 processURL manager state url depth = do
