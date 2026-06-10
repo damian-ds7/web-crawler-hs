@@ -79,7 +79,9 @@ fetchWithBlocking :: HTTP.Manager -> Crawler.State -> URL -> URL -> IO (Either F
 fetchWithBlocking manager state baseURL url = do
   blocked <- isDomainBlocked state baseURL
   if blocked
-    then return $ Left DomainBlocked
+    then do
+      logMessage Info $ "Skipping blocked domain: " <> show baseURL
+      return $ Left DomainBlocked
     else do
       res <- fetchURL manager url
       case res of
@@ -98,7 +100,7 @@ handleRobotsTxt :: HTTP.Manager -> Crawler.State -> URL -> URL -> Int -> IO ()
 handleRobotsTxt manager state url baseURL depth = do
   res <- fetchWithBlocking manager state baseURL (baseURL <> "/robots.txt")
   case res of
-    Left DomainBlocked -> logMessage Info $ "Skipping blocked domain: " <> show baseURL
+    Left DomainBlocked -> return ()
     Left err -> do
       logMessage Warn $ "Failed to fetch robots.txt, allowing all: " <> show baseURL <> " (" <> show err <> ")"
       scrapeAndEnqueue manager state url baseURL depth
@@ -132,7 +134,7 @@ main = do
           { Crawler.userAgent = "web-crawler-hs",
             Crawler.entrypoint = "https://webscraper.io/test-sites/",
             Crawler.threadCount = 8,
-            Crawler.maxDepth = Just 2
+            Crawler.maxDepth = Just 7
           }
   result <- crawl cfg
   putStrLn "\nResults: "
