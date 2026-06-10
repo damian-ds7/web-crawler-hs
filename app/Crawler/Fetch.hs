@@ -1,6 +1,7 @@
 module Crawler.Fetch
   ( makeManager,
     fetchURL,
+    FetchError (..),
   )
 where
 
@@ -38,6 +39,7 @@ makeManager cfg =
 data FetchError
   = TransportError HttpException
   | HttpStatusError Int
+  | DomainBlocked
   deriving (Show)
 
 fetchURL :: Manager -> URL -> IO (Either FetchError ByteString)
