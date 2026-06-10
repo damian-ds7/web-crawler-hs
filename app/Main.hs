@@ -70,6 +70,11 @@ isDomainBlocked state baseURL = atomically $ do
   blocked <- readTVar (blockedDomains state)
   return $ Set.member baseURL blocked
 
+blockDomain :: Crawler.State -> URL -> IO ()
+blockDomain state baseURL = do
+  logMessage Warn $ "Domain returned 429, blocking: " <> show baseURL
+  atomically $ modifyTVar (blockedDomains state) (Set.insert baseURL)
+
 processURL :: HTTP.Manager -> Crawler.State -> URL -> Int -> IO ()
 processURL manager state url depth = do
   case extractDomain url of
