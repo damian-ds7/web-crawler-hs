@@ -15,37 +15,36 @@ import Control.Monad (forM_)
 import Crawler.Fetch (FetchError (..), fetchWithBlocking, makeManager)
 import Crawler.Logger (LogLevel (..), logMessage)
 import Crawler.Parser (parseLinks)
-import Crawler.Robots (cacheRobot, checkRobot, parseRobot)
+import Crawler.Robots (checkRobot, getRobot)
 import Crawler.State (initState)
-import Crawler.Types (State (visitedURLs), URL, urlQueue)
-import Crawler.Types qualified as Crawler
+import Crawler.Types (Config (Config, entrypoint, maxDepth, threadCount, userAgent), State (config, visitedURLs), URL, urlQueue)
 import Crawler.Utils (extractDomain, normalizeURL)
 import Data.ByteString.Char8 qualified as BS
 import Data.Set (Set)
 import Data.Set qualified as Set
 import GHC.Conc (readTVarIO)
-import Network.HTTP.Client qualified as HTTP
+import Network.HTTP.Client (Manager)
 
-shouldStop :: Crawler.State -> Int -> Bool
+shouldStop :: State -> Int -> Bool
 shouldStop state depth =
-  case Crawler.maxDepth (Crawler.config state) of
+  case maxDepth (config state) of
     Nothing -> False
     Just limit -> depth >= limit
 
-crawl :: Crawler.Config -> IO (Set URL)
+crawl :: Config -> IO (Set URL)
 crawl cfg = do
-  state <- initState cfg (Crawler.entrypoint cfg)
+  state <- initState cfg (entrypoint cfg)
   manager <- makeManager cfg
   crawlLoop manager state
   readTVarIO (visitedURLs state)
 
-crawlLoop :: HTTP.Manager -> Crawler.State -> IO ()
+crawlLoop :: Manager -> State -> IO ()
 crawlLoop manager state = do
   inFlight <- newTVarIO (0 :: Int)
-  let n = max 1 (Crawler.threadCount (Crawler.config state))
+  let n = max 1 (threadCount (config state))
   replicateConcurrently_ n (workerLoop manager state inFlight)
 
-workerLoop :: HTTP.Manager -> Crawler.State -> TVar Int -> IO ()
+workerLoop :: Manager -> State -> TVar Int -> IO ()
 workerLoop manager state inFlight = do
   queueRecord <- atomically $ do
     m <- tryReadTQueue (urlQueue state)
@@ -65,34 +64,23 @@ workerLoop manager state inFlight = do
           workerLoop manager state inFlight
     Nothing -> return ()
 
-processURL :: HTTP.Manager -> Crawler.State -> URL -> Int -> IO ()
+processURL :: Manager -> State -> URL -> Int -> IO ()
 processURL manager state url depth = do
   case extractDomain url of
     Nothing -> logMessage Info $ "Skipping malformed URL: " <> show url
-    Just baseURL -> handleRobotsTxt manager state url baseURL depth
-
-handleRobotsTxt :: HTTP.Manager -> Crawler.State -> URL -> URL -> Int -> IO ()
-handleRobotsTxt manager state url baseURL depth = do
-  res <- fetchWithBlocking manager state baseURL (baseURL <> "/robots.txt")
-  case res of
-    Left DomainBlocked -> return ()
-    Left err -> do
-      logMessage Warn $ "Failed to fetch robots.txt, allowing all: " <> show baseURL <> " (" <> show err <> ")"
-      scrapeAndEnqueue manager state url baseURL depth
-    Right body -> do
-      let robot = parseRobot body
-      cacheRobot state baseURL robot
+    Just baseURL -> do
+      robot <- getRobot manager state baseURL
       if checkRobot robot state baseURL url
         then scrapeAndEnqueue manager state url baseURL depth
         else logMessage Info $ "Blocked by robots.txt: " <> show url
 
-scrapeAndEnqueue :: HTTP.Manager -> Crawler.State -> URL -> URL -> Int -> IO ()
+scrapeAndEnqueue :: Manager -> State -> URL -> URL -> Int -> IO ()
 scrapeAndEnqueue manager state url baseURL depth = do
   atomically $ modifyTVar (visitedURLs state) (Set.insert url)
   res <- fetchWithBlocking manager state baseURL url
   case res of
     Left DomainBlocked -> return ()
-    Left err -> logMessage Error $ "Failed to scrape " <> show url <> ": " <> show err
+    Left err -> logMessage Warn $ "Failed to scrape " <> show url <> ": " <> show err
     Right body -> do
       let foundURLs = parseLinks body
           nonEmpty = filter (not . BS.null) foundURLs
@@ -105,11 +93,11 @@ scrapeAndEnqueue manager state url baseURL depth = do
 main :: IO ()
 main = do
   let cfg =
-        Crawler.Config
-          { Crawler.userAgent = "web-crawler-hs",
-            Crawler.entrypoint = "https://webscraper.io/test-sites/",
-            Crawler.threadCount = 8,
-            Crawler.maxDepth = Just 2
+        Config
+          { userAgent = "web-crawler-hs",
+            entrypoint = "https://webscraper.io/test-sites/",
+            threadCount = 8,
+            maxDepth = Just 3
           }
   result <- crawl cfg
   putStrLn "\nResults: "
