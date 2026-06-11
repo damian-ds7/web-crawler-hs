@@ -27,7 +27,7 @@ Dla każdego URL-a wykonywany będzie następujący ciąg operacji:
 - Wyciąganie linków i innych danych
 - Zamiana linków względnych na absolutne
 - Usuwanie duplikatów i fragmentów URL
-- Bibbliteki: `scalpel`, `network-uri`
+- Biblioteki: `scalpel`, `network-uri`
 
 #### 2.3 Filtrowanie
 
